@@ -34,7 +34,7 @@ thermal:
   tau_seconds: 180.0
   r_th_c_per_w: 0.08
   t_ambient_c: 55.0
-  t_limit_c: 90.0
+  t_limit_c: 120.0
 model:
   backend: auto
   test_fraction: 0.2

@@ -7,7 +7,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import (precision_score, recall_score, f1_score,
+                             average_precision_score)
 
 INK, BLUE, RED, GRID = "#1a1a1a", "#2166AC", "#B2182B", "#C9C9C9"
 
@@ -52,20 +53,34 @@ def _lead_ms(scores, thr, meta, df_sim, dt, H, test_mask):
 
 
 def evaluate(scores_dict, y, meta, df_sim, dt, cfg, backend):
+    """Primary metric is PR-AUC (average precision) — threshold-free, the right
+    metric for rare-event detection. Precision/recall/F1 are reported at a fixed
+    alarm budget equal to the training-set base rate (flag the top-k riskiest
+    windows), which transfers across time slices far better than a fixed score
+    threshold. Lead time is measured at that operating point."""
     H = max(1, int(cfg["features"]["horizon_seconds"] / dt))
     tr, va, te = temporal_split(meta, cfg)
+    base_rate = float(y[tr | va].mean()) or 0.1       # alarm budget (no test labels used)
     rows = []
     order = ["Reactive di/dt threshold", "Forecast + threshold", backend]
+    yte = y[te]
     for name in order:
         sc = scores_dict[name]
-        thr = pick_threshold(sc[va], y[va], cfg["model"]["target_recall"])
-        pred = (sc[te] >= thr).astype(int)
-        p = precision_score(y[te], pred, zero_division=0)
-        r = recall_score(y[te], pred, zero_division=0)
-        f = f1_score(y[te], pred, zero_division=0)
+        ste = sc[te]
+        if yte.sum() == 0:
+            rows.append(dict(model=name, pr_auc=float("nan"), precision=0.0,
+                             recall=0.0, f1=0.0, lead_ms=0))
+            continue
+        ap = average_precision_score(yte, ste)
+        k = max(1, int(round(base_rate * len(ste))))  # flag the k riskiest windows
+        thr = np.sort(ste)[::-1][min(k - 1, len(ste) - 1)]
+        pred = (ste >= thr).astype(int)
+        p = precision_score(yte, pred, zero_division=0)
+        r = recall_score(yte, pred, zero_division=0)
+        f = f1_score(yte, pred, zero_division=0)
         lead = _lead_ms(sc, thr, meta, df_sim, dt, H, te)
-        rows.append(dict(model=name, precision=round(p, 2), recall=round(r, 2),
-                         f1=round(f, 2), lead_ms=round(lead)))
+        rows.append(dict(model=name, pr_auc=round(float(ap), 3), precision=round(p, 2),
+                         recall=round(r, 2), f1=round(f, 2), lead_ms=round(lead)))
     return rows, (tr, va, te)
 
 
@@ -111,10 +126,10 @@ def write_results(out_dir, table1, table2, backend, cfg, fig):
     # human-readable tables
     with open(os.path.join(out_dir, "tables.md"), "w") as fh:
         fh.write(f"Provenance: {results['provenance']}  |  backend: {backend}\n\n")
-        fh.write("Table I — event prediction\n")
-        fh.write("model | precision | recall | f1 | lead(ms)\n")
+        fh.write("Table I — event prediction (PR-AUC is the headline metric)\n")
+        fh.write("model | PR-AUC | precision | recall | f1 | lead(ms)\n")
         for r in table1:
-            fh.write(f"{r['model']} | {r['precision']} | {r['recall']} | {r['f1']} | {r['lead_ms']}\n")
+            fh.write(f"{r['model']} | {r.get('pr_auc')} | {r['precision']} | {r['recall']} | {r['f1']} | {r['lead_ms']}\n")
         fh.write("\nTable II — power-integrity outcome\n")
         for r in table2:
             fh.write(" | ".join(r) + "\n")

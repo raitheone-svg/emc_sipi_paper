@@ -9,9 +9,10 @@ import pandas as pd
 def node_power(cpu, mem, cfg):
     p = cfg["power"]
     span = p["p_peak_w"] - p["p_idle_w"]
-    # piecewise-linear idle->peak on CPU, small memory term
+    # dynamic power tracks total (summed) container activity; no upper saturation
+    # so node-current variation is preserved for the PDN response.
     util = np.clip(cpu, 0, None) + p["mem_weight"] * np.clip(mem, 0, None)
-    return p["p_idle_w"] + span * np.clip(util, 0, 1.5)
+    return p["p_idle_w"] + span * util
 
 
 def pdn_voltage(current, dt, cfg):
@@ -71,8 +72,9 @@ def simulate(df, dt, cfg):
         vfloor = pdn["vmin_mv"] + pdn["margin_mv"]
     cfg["pdn"]["_resolved_vfloor_mv"] = vfloor
 
-    # pass 2: label
+    # pass 2: label. With a target_event_rate the event = droop only (so the
+    # rate is exactly the target); otherwise droop OR thermal throttle.
     allrec["droop"] = allrec["voltage_mv"] < vfloor
     allrec["throttle"] = allrec["temp_c"] > tlimit
-    allrec["event"] = allrec["droop"] | allrec["throttle"]
+    allrec["event"] = allrec["droop"] if target else (allrec["droop"] | allrec["throttle"])
     return allrec

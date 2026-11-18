@@ -16,7 +16,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python -m pip install torch        # OPTIONAL: enables the TCN+attention model (paper model)
+pip install torch        # OPTIONAL: enables the TCN+attention model (paper model)
 ```
 Without `torch`, the learned model falls back to a gradient-boosted tree
 (`backend` is reported in every result, so provenance is never ambiguous).

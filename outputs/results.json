@@ -1,7 +1,7 @@
 {
   "provenance": "REAL:Alibaba-microservices-v2022",
   "dataset": "alibaba",
-  "backend": "TCN+attention (PyTorch)",
+  "backend": "GBDT (sklearn demo stand-in)",
   "pdn": {
     "r_ohm": 0.0004,
     "l_henry": 9e-10,
@@ -11,38 +11,38 @@
   "table1": [
     {
       "model": "Reactive di/dt threshold",
-      "precision": 0.25,
-      "recall": 0.69,
-      "f1": 0.37,
-      "lead_ms": 120000
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "lead_ms": 0
     },
     {
       "model": "Forecast + threshold",
-      "precision": 0.47,
-      "recall": 0.65,
-      "f1": 0.54,
-      "lead_ms": 120000
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "lead_ms": 0
     },
     {
-      "model": "TCN+attention (PyTorch)",
-      "precision": 0.3,
-      "recall": 0.42,
-      "f1": 0.35,
-      "lead_ms": 120000
+      "model": "GBDT (sklearn demo stand-in)",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "lead_ms": 0
     }
   ],
   "table2": [
     [
       "Peak droop (mV)",
-      "33",
-      "33",
+      "64",
+      "64",
       "+0%"
     ],
     [
       "p99 droop (mV)",
-      "24",
-      "25",
-      "+1%"
+      "36",
+      "36",
+      "-2%"
     ],
     [
       "Reclaim. guardband (mV)",
@@ -59,15 +59,15 @@
     [
       "p99 latency cost (ms)",
       "\u2014",
-      "+100497.6",
+      "+20666.7",
       "\u2014"
     ],
     [
       "SLO violation rate",
       "1.00\u00d7",
-      "0.92\u00d7",
-      "-8%"
+      "0.90\u00d7",
+      "-10%"
     ]
   ],
-  "fig2_png": "/Users/akhileshrai/Downloads/pipeline/outputs/fig2_droop.png"
+  "fig2_png": "/Users/akhileshrai/Downloads/emc_sipi_paper/outputs/fig2_droop.png"
 }

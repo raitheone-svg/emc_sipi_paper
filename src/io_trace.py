@@ -96,39 +96,81 @@ def load_alibaba(cfg):
         for chunk in pd.read_csv(path, header=header, names=names, chunksize=CHUNK):
             yield chunk.rename(columns=alias)
 
-    # ---- choose table: Node (node-level) preferred, else MSResource ----
-    files = _find("NodeMetrics", "Node", exclude=("MSMetrics", "MSResource", "MSRTMCR", "CallGraph"))
-    if files:
-        schema, cpu_agg = NODE_COLS, "mean"      # one row per node per 60 s
-    else:
-        files = _find("MSMetrics", "MSResource", exclude=("MSRTMCR", "CallGraph", "Node"))
-        if not files:
-            raise FileNotFoundError(
-                f"No Node/NodeMetrics or MSResource CSV under {dd}. Extract the "
-                "downloaded .tar.gz into data/ (see DOWNLOAD_REAL_DATA.md).")
-        schema, cpu_agg = MSRES_COLS, "sum"      # sum containers -> node
+    # ---- choose table: MSResource (per-container, RICH) preferred ------
+    ACTIVE_THR = 0.05
+    ms_files = _find("MSMetrics", "MSResource",
+                     exclude=("MSRTMCR", "CallGraph", "NodeMetrics", "Node"))
+    node_files = _find("NodeMetrics", "Node",
+                       exclude=("MSMetrics", "MSResource", "MSRTMCR", "CallGraph"))
 
-    # pass 1 (streamed): peak cpu per node, to pick the busiest max_nodes
+    if ms_files:
+        # pass 1: approximate busiest nodes by per-chunk node CPU sum
+        peak = {}
+        for p in ms_files:
+            for ch in _iter(p, MSRES_COLS):
+                ch = ch.assign(t_step=(ch["timestamp"] / 1000.0 / dt).astype(int))
+                s = ch.groupby(["nodeid", "t_step"])["cpu"].sum().groupby("nodeid").max()
+                for nid, v in s.items():
+                    if v > peak.get(nid, -1.0):
+                        peak[nid] = v
+        top = set(sorted(peak, key=peak.get, reverse=True)[:max_nodes])
+
+        # pass 2: per (node,t_step) accumulate container stats (chunk-safe)
+        parts = []
+        for p in ms_files:
+            for ch in _iter(p, MSRES_COLS):
+                ch = ch[ch["nodeid"].isin(top)]
+                if not len(ch):
+                    continue
+                ch = ch.assign(t_step=(ch["timestamp"] / 1000.0 / dt).astype(int),
+                               cpu2=lambda d: d["cpu"] ** 2,
+                               act=lambda d: (d["cpu"] > ACTIVE_THR).astype(float))
+                parts.append(ch.groupby(["nodeid", "t_step"]).agg(
+                    cnt=("cpu", "size"), s=("cpu", "sum"), sq=("cpu2", "sum"),
+                    mx=("cpu", "max"), nact=("act", "sum"),
+                    msum=("mem", "sum"), mcnt=("mem", "size")).reset_index())
+        a = (pd.concat(parts, ignore_index=True).groupby(["nodeid", "t_step"])
+               .agg(cnt=("cnt", "sum"), s=("s", "sum"), sq=("sq", "sum"),
+                    mx=("mx", "max"), nact=("nact", "sum"),
+                    msum=("msum", "sum"), mcnt=("mcnt", "sum")).reset_index())
+        a["cpu"] = a["s"]                                   # node current proxy
+        scale = a["cpu"].quantile(0.95)                     # normalize so p95 ~ 1
+        if scale and scale > 0:
+            a["cpu"] = a["cpu"] / scale
+        a["mem"] = a["msum"] / a["mcnt"]
+        var = (a["sq"] / a["cnt"] - (a["s"] / a["cnt"]) ** 2).clip(lower=0)
+        a["ms_std"] = var ** 0.5                            # spread of per-MS load
+        a["ms_max"] = a["mx"]                               # busiest single MS
+        a["n_active"] = a["nact"]                           # co-bursting MS count
+        g = a.rename(columns={"nodeid": "node"})
+        g["callrate"] = 0.0
+        g["fanout"] = 0.0
+        cols = ["node", "t_step", "cpu", "mem", "callrate", "fanout",
+                "n_active", "ms_std", "ms_max"]
+        return g[cols], dt
+
+    # ---- fallback: node-level Node table (no per-MS features) -----------
+    if not node_files:
+        raise FileNotFoundError(
+            f"No MSResource/MSMetrics or Node CSV under {dd}. Extract the "
+            "downloaded .tar.gz into data/ (see DOWNLOAD_REAL_DATA.md).")
     peak = {}
-    for p in files:
-        for ch in _iter(p, schema):
+    for p in node_files:
+        for ch in _iter(p, NODE_COLS):
             for nid, v in ch.groupby("nodeid")["cpu"].max().items():
                 if v > peak.get(nid, -1.0):
                     peak[nid] = v
     top = set(sorted(peak, key=peak.get, reverse=True)[:max_nodes])
-
-    # pass 2 (streamed): keep only the busiest nodes, aggregate to (node, t_step)
     parts = []
-    for p in files:
-        for ch in _iter(p, schema):
+    for p in node_files:
+        for ch in _iter(p, NODE_COLS):
             ch = ch[ch["nodeid"].isin(top)]
             if len(ch):
                 ch = ch.assign(t_step=(ch["timestamp"] / 1000.0 / dt).astype(int))
                 parts.append(ch.groupby(["nodeid", "t_step"])
-                               .agg(cpu=("cpu", cpu_agg), mem=("mem", "mean")).reset_index())
-    g = (pd.concat(parts, ignore_index=True)
-           .groupby(["nodeid", "t_step"])
-           .agg(cpu=("cpu", cpu_agg), mem=("mem", "mean")).reset_index())
+                               .agg(cpu=("cpu", "mean"), mem=("mem", "mean")).reset_index())
+    g = (pd.concat(parts, ignore_index=True).groupby(["nodeid", "t_step"])
+           .agg(cpu=("cpu", "mean"), mem=("mem", "mean")).reset_index())
     g = g.rename(columns={"nodeid": "node"})
     g["callrate"] = 0.0
     g["fanout"] = 0.0
