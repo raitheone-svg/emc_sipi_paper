@@ -41,8 +41,8 @@ def main():
     print("[5/6] evaluating (Table I) ...")
     table1, _ = report.evaluate(scores, y, meta, df_sim, dt, cfg, backend)
     for r in table1:
-        print(f"      {r['model']:<32} P={r['precision']} R={r['recall']} "
-              f"F1={r['f1']} lead={r['lead_ms']}ms")
+        print(f"      {r['model']:<32} PR-AUC={r.get('pr_auc')} P={r['precision']} "
+              f"R={r['recall']} F1={r['f1']} lead={r['lead_ms']}ms")
 
     print("[6/6] controller replay + outcome (Table II) ...")
     table2, fig = controller.run(df_trace, df_sim, dt, scores[backend], meta, cfg)
