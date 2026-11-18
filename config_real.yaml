@@ -1,0 +1,47 @@
+run:
+  out_dir: outputs
+  seed: 7
+data:
+  mode: alibaba
+  data_dir: ./data
+  dt_seconds: 60.0
+  max_nodes: 50
+features:
+  window_seconds: 600.0
+  horizon_seconds: 120.0
+power:
+  p_idle_w: 120.0
+  p_peak_w: 400.0
+  mem_weight: 0.15
+  vdd_v: 0.9
+pdn:
+  vnom_mv: 900.0
+  r_ohm: 0.0004
+  l_henry: 9.0e-10
+  vmin_mv: 872.0
+  margin_mv: 0.0
+  sweep:
+    l_henry:
+    - 6.0e-10
+    - 9.0e-10
+    - 1.2e-09
+    r_ohm:
+    - 0.0003
+    - 0.0004
+    - 0.0005
+  target_event_rate: 0.1
+thermal:
+  tau_seconds: 180.0
+  r_th_c_per_w: 0.08
+  t_ambient_c: 55.0
+  t_limit_c: 90.0
+model:
+  backend: auto
+  test_fraction: 0.2
+  val_fraction: 0.2
+  target_recall: 0.65
+controller:
+  risk_threshold: 0.5
+  stagger_steps: 3
+  max_concurrent_scaleups: 2
+  provenance: REAL:Alibaba-microservices-v2022

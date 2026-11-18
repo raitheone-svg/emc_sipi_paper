@@ -1,0 +1,73 @@
+{
+  "provenance": "REAL:Alibaba-microservices-v2022",
+  "dataset": "alibaba",
+  "backend": "TCN+attention (PyTorch)",
+  "pdn": {
+    "r_ohm": 0.0004,
+    "l_henry": 9e-10,
+    "vmin_mv": 872.0,
+    "vnom_mv": 900.0
+  },
+  "table1": [
+    {
+      "model": "Reactive di/dt threshold",
+      "precision": 0.25,
+      "recall": 0.69,
+      "f1": 0.37,
+      "lead_ms": 120000
+    },
+    {
+      "model": "Forecast + threshold",
+      "precision": 0.47,
+      "recall": 0.65,
+      "f1": 0.54,
+      "lead_ms": 120000
+    },
+    {
+      "model": "TCN+attention (PyTorch)",
+      "precision": 0.3,
+      "recall": 0.42,
+      "f1": 0.35,
+      "lead_ms": 120000
+    }
+  ],
+  "table2": [
+    [
+      "Peak droop (mV)",
+      "33",
+      "33",
+      "+0%"
+    ],
+    [
+      "p99 droop (mV)",
+      "24",
+      "25",
+      "+1%"
+    ],
+    [
+      "Reclaim. guardband (mV)",
+      "\u2014",
+      "0",
+      "+0"
+    ],
+    [
+      "Throttle events / hr",
+      "0.0",
+      "0.0",
+      "\u2014"
+    ],
+    [
+      "p99 latency cost (ms)",
+      "\u2014",
+      "+100497.6",
+      "\u2014"
+    ],
+    [
+      "SLO violation rate",
+      "1.00\u00d7",
+      "0.92\u00d7",
+      "-8%"
+    ]
+  ],
+  "fig2_png": "/Users/akhileshrai/Downloads/pipeline/outputs/fig2_droop.png"
+}
